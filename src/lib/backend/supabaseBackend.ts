@@ -105,6 +105,21 @@ export async function createSupabaseBackend(
       if (patch.nickname !== undefined) row.nickname = patch.nickname;
       if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
       if (patch.avatarColor !== undefined) row.avatar_color = patch.avatarColor;
+      if (row.nickname === undefined) {
+        const { data: profile, error: readError } = await sb
+          .from('profiles')
+          .select('nickname')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (readError) {
+          return { ok: false, error: readError.message };
+        }
+
+        if (profile?.nickname) {
+          row.nickname = profile.nickname;
+        }
+      }
       const { error } = await sb.from('profiles').upsert(row, { onConflict: 'id' });
       return error ? { ok: false, error: error.message } : { ok: true };
     },
