@@ -98,7 +98,7 @@ export async function createSupabaseBackend(
       return error ? { ok: false, error: error.message } : { ok: true };
     },
 
-async updateProfile(patch) {
+    async updateProfile(patch) {
       const { data } = await sb.auth.getUser();
       if (!data.user) return { ok: false, error: '로그인이 필요합니다.' };
       const row: Record<string, unknown> = { id: data.user.id };
@@ -124,16 +124,6 @@ async updateProfile(patch) {
         };
       });
     },
-
-  if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
-  if (patch.avatarColor !== undefined) row.avatar_color = patch.avatarColor;
-
-  const { error } = await sb
-    .from('profiles')
-    .upsert(row, { onConflict: 'id' });
-
-  return error ? { ok: false, error: error.message } : { ok: true };
-},
 
     async fetchList<T extends ListItem>(coll: string): Promise<T[]> {
       const { data, error } = await sb.from(coll).select('id, data, sort').order('sort', { ascending: true });
