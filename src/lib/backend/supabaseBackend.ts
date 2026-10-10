@@ -98,32 +98,41 @@ export async function createSupabaseBackend(
       return error ? { ok: false, error: error.message } : { ok: true };
     },
 
-    async updateProfile(patch) {
-      const { data } = await sb.auth.getUser();
-      if (!data.user) return { ok: false, error: '로그인이 필요합니다.' };
-      const row: Record<string, unknown> = { id: data.user.id };
-      if (patch.nickname !== undefined) row.nickname = patch.nickname;
-      if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
-      if (patch.avatarColor !== undefined) row.avatar_color = patch.avatarColor;
-      const { error } = await sb.from('profiles').upsert(row, { onConflict: 'id' });
-      return error ? { ok: false, error: error.message } : { ok: true };
-    },
+async updateProfile(patch) {
+  const { data } = await sb.auth.getUser();
+  if (!data.user) return { ok: false, error: '로그인이 필요합니다.' };
 
-    // Supabase는 스키마의 트리거가 첫 가입자를 관리자로 만들어 준다 — 추가 작업 없음
-    async claimOwner() { return { ok: true }; },
+  const { data: existing, error: readError } = await sb
+    .from('profiles')
+    .select('nickname')
+    .eq('id', data.user.id)
+    .maybeSingle();
 
-    async listMembers() {
-      // avatar_url도 함께 — 이미지 정리가 프로필 사진을 「안 쓰는 파일」로 지우지 않게 (v2.0 사용자 제보)
-      const { data, error } = await sb.from('profiles').select('id, nickname, role, avatar_url').order('created_at');
-      if (error) throw error;
-      return (data ?? []).map(r => {
-        const p = r as { id: string; nickname: string; role: string; avatar_url?: string | null };
-        return {
-          id: p.id, nickname: p.nickname, role: (p.role as 'admin' | 'member') ?? 'member',
-          avatarUrl: p.avatar_url ?? undefined,
-        };
-      });
-    },
+  if (readError) {
+    return { ok: false, error: readError.message };
+  }
+
+  const nickname =
+    patch.nickname ??
+    existing?.nickname ??
+    (data.user.user_metadata?.nickname as string | undefined) ??
+    data.user.email ??
+    'user';
+
+  const row: Record<string, unknown> = {
+    id: data.user.id,
+    nickname,
+  };
+
+  if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+  if (patch.avatarColor !== undefined) row.avatar_color = patch.avatarColor;
+
+  const { error } = await sb
+    .from('profiles')
+    .upsert(row, { onConflict: 'id' });
+
+  return error ? { ok: false, error: error.message } : { ok: true };
+},
 
     async fetchList<T extends ListItem>(coll: string): Promise<T[]> {
       const { data, error } = await sb.from(coll).select('id, data, sort').order('sort', { ascending: true });
