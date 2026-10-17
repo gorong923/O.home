@@ -223,11 +223,21 @@ export async function createSupabaseBackend(
       return n;
     },
 
-    subscribe(coll, onChange) {
-      const ch = sb.channel(`ohome:${coll}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: coll }, () => onChange())
+subscribe(coll, onChange) {
+      const channelName =
+        `ohome:${coll}:${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const ch = sb.channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: coll },
+          () => onChange()
+        )
         .subscribe();
-      return () => { void sb.removeChannel(ch); };
+
+      return () => {
+        void sb.removeChannel(ch);
+      };
     },
 
     async fetchSetting<T>(key: string) {
